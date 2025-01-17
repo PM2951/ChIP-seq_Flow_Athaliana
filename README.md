@@ -47,7 +47,7 @@ pip install openpyxl pandas MACS3
 1. Creat shortcut:
 
    ```bash
-   echo "alias ChIPseq_main_run='python \"$HOME/ChIP-seq_Flow_Athaliana/ChIPseq_main_run.py\"'" >> ~/.bashrc
+   echo "alias ChIPseq_main_run='python3 \"$HOME/ChIP-seq_Flow_Athaliana/ChIPseq_main_run.py\"'" >> ~/.bashrc
    source ~/.bashrc
    ```
 

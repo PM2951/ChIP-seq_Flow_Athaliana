@@ -9,10 +9,24 @@ This repository provides a streamlined workflow for analyzing ChIP-seq data, lev
 ### Required Software
 - Python (>= 3.8)
 - R (>= 4.0)
+- Bowtie2
+- samtools
+- MACS3
 
 Ensure both Python and R are installed on your system.
 
 ## Installation
+
+### Download files
+```bash
+curl https://ftp.ensemblgenomes.ebi.ac.uk/pub/plants/release-60/fasta/arabidopsis_thaliana/dna/Arabidopsis_thaliana.TAIR10.dna.toplevel.fa.gz -o Arabidopsis_thaliana.TAIR10.dna.toplevel.fa.gz
+gunzip Arabidopsis_thaliana.TAIR10.dna.toplevel.fa.gz
+```
+### Make index files
+
+```bash
+bowtie2-build -f Arabidopsis_thaliana.TAIR10.dna.toplevel.fa TAIR10
+```
 
 ### Python Dependencies
 Install the required Python packages using `pip`:

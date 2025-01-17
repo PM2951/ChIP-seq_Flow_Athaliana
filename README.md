@@ -56,17 +56,17 @@ pip install openpyxl pandas MACS3
   
    - main run:
    
-   ```bash
-   ChIPseq_main_run -r 1 -n 32 -c Control_NAME -t Treated_NAME -m -p -a
-   ```
+      ```bash
+      ChIPseq_main_run -r 1 -n 32 -c Control_NAME -t Treated_NAME -m -p -a
+      ```
 
 
 
-   or (not alias ver.)
+      or (not alias ver.)
 
-   ```bash
-   python ChIPseq_main_run.py -r 1 -n 32 -c Control_NAME -t Treated_NAME -m -p -a
-   ```
+      ```bash
+      python ChIPseq_main_run.py -r 1 -n 32 -c Control_NAME -t Treated_NAME -m -p -a
+      ```
 
 
 ---

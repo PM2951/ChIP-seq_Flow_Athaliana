@@ -69,6 +69,23 @@ pip install openpyxl pandas MACS3
       ```
 
 
+   #### Command-line Options
+
+   
+   | Option               | Description                                                                                              |
+   |----------------------|----------------------------------------------------------------------------------------------------------|
+   | `-h`                 | Show the help message and exit.                                                                          |
+   | `-r                  | Specify read type: `1` for single-end reads, `2` for paired-end reads.                                   |
+   | `-c CONTROL`         | Specify the common prefix (e.g., FILENAME) of the control sample files in FASTQ format. The files should follow the naming pattern: `FILENAME_001_R1_001.fastq`, `FILENAME_002_R1_001.fastq`, `FILENAME_001_R1_003.fastq`, `FILENAME_002_R1_004.fastq`. For example, if you input `FILENAME`, the script will process all matching files in the directory. The control sample is used to normalize the signal and reduce false positives in peak calling. |
+   | `-t 　　　　         | Specify the common prefix (e.g., FILENAME) of the treated sample files in FASTQ format. The files should follow the naming pattern: `FILENAME_001_R1_001.fastq`, `FILENAME_002_R1_001.fastq`, `FILENAME_003_R1_001.fastq`, `FILENAME_004_R1_001.fastq`. For example, if you input `FILENAME`, the script will process all matching files in the directory. The treated sample is used to identify regions with significant changes in signal compared to the control sample during peak calling. |
+   | `-m`            　   | Perform read mapping to the reference genome.                                                           |
+   | `-p`                 | Perform peak calling to identify ChIP-enriched regions.                                                 |
+   | `-a`                 | Annotate identified peaks with genomic features (e.g., genes, promoters).                               |
+   | `-n`                 | Specify number of CPU cores for parallel processing (default: 32).                                       |
+
+   Replace the arguments as needed to suit your analysis.
+
+
 ---
 
 ### License

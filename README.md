@@ -47,7 +47,6 @@ pip install openpyxl pandas MACS3
 1. Clone the repository:
 
    ```bash
-   git clone https://github.com/PM2951/ChIP-seq_Flow_Athaliana.git
    echo "alias ChIPseq_main_run='python \"$HOME/ChIP-seq_Flow_Athaliana/ChIPseq_main_run.py\"'" >> ~/.bashrc
    source ~/.bashrc
    ```

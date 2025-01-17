@@ -44,7 +44,7 @@ pip install openpyxl pandas MACS3
 
 ## How to Run the Workflow
 
-1. Clone the repository:
+1. Creat shortcut:
 
    ```bash
    echo "alias ChIPseq_main_run='python \"$HOME/ChIP-seq_Flow_Athaliana/ChIPseq_main_run.py\"'" >> ~/.bashrc

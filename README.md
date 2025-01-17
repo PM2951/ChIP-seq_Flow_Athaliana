@@ -44,6 +44,14 @@ BiocManager::install("ChIPpeakAnno")
 2. Execute the main script with required arguments.
   
    For example:
+   
+   ```bash
+   ChIPseq_main_run -r 1 -n 32 -c Control_NAME -t Treated_NAME -m -p -a
+   ```
+
+
+
+   or (not alias ver.)
 
    ```bash
    python ChIPseq_main_run.py -r 1 -n 32 -c Control_NAME -t Treated_NAME -m -p -a

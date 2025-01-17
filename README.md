@@ -47,7 +47,18 @@ pip install openpyxl pandas MACS3
    source ~/.bashrc
    ```
 
-2. Execute the main script with required arguments.
+2. Move to your directory containing the required FASTQ files:
+   ```bash
+   cd <your directory>
+   ```
+
+   - FASTQ files are required (uncompressed .fastq format only).
+   - If your files are compressed (e.g., .gz), make sure to decompress them first using.
+     ```bash
+     gunzip *.gz
+     ```
+
+4. Execute the main script with required arguments.
 
    - help
      ```bash

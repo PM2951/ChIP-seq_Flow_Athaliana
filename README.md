@@ -37,7 +37,7 @@ BiocManager::install("ChIPpeakAnno")
 
    ```bash
    git clone https://github.com/PM2951/ChIP-seq_Flow_Athaliana.git
-   echo "alias ChIPseq_main_run='python \"$HOME/repository-name/ChIPseq_main_run.py\"'" >> ~/.bashrc
+   echo "alias ChIPseq_main_run='python \"$HOME/PM2951/ChIPseq_main_run.py\"'" >> ~/.bashrc
    source ~/.bashrc
    ```
 

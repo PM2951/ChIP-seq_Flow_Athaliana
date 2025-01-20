@@ -101,6 +101,20 @@ pip install MACS3==3.0.0a3
 
    Replace the arguments as needed to suit your analysis.
 
+---
+
+### parameter
+- single end
+
+  macs3 callpeak ; -p 0.05 -g 1.19e8
+
+- pair end
+
+  macs3 callpeak ; -p 0.05 -g 1.19e8 -f BAMPE
+
+- annotation
+
+  annotatePeakInBatch() ; featureType="TSS", multiple=TRUE, maxgap=10, PeakLocForDistance="middle", FeatureLocForDistance="TSS", select="first"
 
 ---
 

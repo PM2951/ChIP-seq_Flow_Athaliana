@@ -38,7 +38,7 @@ curl https://ftp.ensemblgenomes.ebi.ac.uk/pub/plants/release-60/fasta/arabidopsi
 gunzip Arabidopsis_thaliana.TAIR10.dna.toplevel.fa.gz
 bowtie2-build -f Arabidopsis_thaliana.TAIR10.dna.toplevel.fa TAIR10
 pip install openpyxl pandas
-pip install MACS3==3.0.0a3
+pip install MACS3
 ```
 
 ---

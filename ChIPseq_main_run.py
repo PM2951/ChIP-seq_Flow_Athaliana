@@ -7,7 +7,7 @@ import argparse
 
 # 設定ファイルをインポート
 import config  
-from ChIPseq_app_utili import mapping, peakcall, annotation, write_run_parameters
+from ChIPseq_utili import mapping, peakcall, annotation, write_run_parameters
 
 
 file_extentions = (".fastq", ".fastq.gz", ".fq", ".fq.gz", "fasta", ".fasta.gz")

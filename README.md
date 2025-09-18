@@ -41,11 +41,16 @@ pip install openpyxl pandas
 pip install MACS3
 ```
 
+### Rename directory name in config.py 
+
+```Python
+<your path> to your directory 
+```
 ---
 
 ## How to Run the Workflow
 
-1. Creat shortcut:
+1. Creat shortcut (bashrc):
 
    ```bash
    echo "alias ChIPseq_main_run='python3 \"$HOME/ChIP-seq_Flow_Athaliana/ChIPseq_main_run.py\"'" >> ~/.bashrc

@@ -210,6 +210,7 @@ except:
         with open(log_file_path, "r") as log_file:
             lines = log_file.readlines()
             print("".join(lines[-3:]), flush=True)
+    raise ValueError("Error during peak calling. Check log_peakcall.txt for details.")
 
 try:
     if params["annotation_flag"]:

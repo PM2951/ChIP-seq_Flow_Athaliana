@@ -1,156 +1,193 @@
-
 import subprocess
 import pandas as pd
 import os
 import shutil
+from pathlib import Path
+from typing import List
 
-current_directory = os.getcwd()
-files_in_directory = os.listdir(current_directory)
+import config  
 
-script_path = os.path.dirname(os.path.abspath(__file__))
-singe_script_path = f"{script_path}/mapping_single.sh"
-pairend_script_path = f"{script_path}/mapping_pairend.sh"
-r_script_path = f"{script_path}/R_annotation_code.R"
-
-# Grant execution permissions to scripts
-subprocess.run(["chmod", "+x", singe_script_path], capture_output=True, text=True)
-subprocess.run(["chmod", "+x", pairend_script_path], capture_output=True, text=True)
-subprocess.run(["chmod", "+x", r_script_path], capture_output=True, text=True)
-
-def print_green(text):
-    """Prints text in green color.
-
-    Args:
-        text (str): The text to print.
-    """
-    print("\033[92m" + text + "\033[0m")
-
-def print_red(text):
-    """Prints text in red color.
-
-    Args:
-        text (str): The text to print.
-    """
-    print("\033[91m" + text + "\033[0m")
-
-
-def mapping(fastaq_file_name, read_type, num_cores):
-    """Performs read mapping using a shell script.
-
-    Args:
-        fastaq_file_name (str): Name of the input FASTQ file (without extension).
-        read_type (str): '1' for single-end reads, '2' for paired-end reads.
-
-    Raises:
-        TypeError: If read_type is invalid or mapping fails.
-    """
-    print_green("========== mapping ==========")
-    mapping_result = None
+def check_executable(software_name: str):
     try:
-        if f"{fastaq_file_name}.sam" not in files_in_directory:
-            if read_type == "1":
-                script = singe_script_path
-            elif read_type == "2":
-                script = pairend_script_path
+        software_path = shutil.which(software_name)
+        return software_path
+    except Exception as e:
+        raise RuntimeError(f"{software_name} not found. Install {software_name} or pass --{software_name} PATH")
+
+def copy_if_not_exists(src_dir, dest_dir, filenames):
+    for filename in filenames:
+        src = os.path.join(src_dir, filename)
+        dst = os.path.join(dest_dir, filename)
+        if not os.path.exists(dst):
+            shutil.copyfile(src, dst)
+
+
+def write_run_parameters(output_dir, file_name=None, **kwargs):
+    if file_name is None:
+        file_name = config.PARAMS_LOG_FILE 
+    param_log_file = os.path.join(output_dir, file_name)
+    os.makedirs(output_dir, exist_ok=True)
+    with open(param_log_file, "w", encoding="utf-8") as f:
+        f.write("[ChIP-seq Run Parameters]\n")
+        for key, value in kwargs.items():
+            if isinstance(value, list):
+                f.write(f"{key}:\n")
+                for item in value:
+                    f.write(f"  - {item}\n")
             else:
-                raise TypeError('Invalid read_type argument.')
+                f.write(f"{key}: {value}\n")
 
-            mapping_result = subprocess.run([script, fastaq_file_name, num_cores],
-                                             capture_output=True, text=True)
 
-            output_file = 'output_mapping.txt'
-            subprocess.run(["chmod", "+w", output_file], capture_output=True, text=True)
-            mode = "a" if os.path.exists(output_file) else "w"
-            with open(output_file, mode) as f:
-                f.write(f"\n{fastaq_file_name}\n")
-                f.write(mapping_result.stdout)
-                f.write(mapping_result.stderr)
-                f.write("\n")
-            print("Mapping results saved in", output_file)
-    except:
-        raise TypeError('Mapping error')
+def mapping(output_name: str, input_files: List[str], output_dir: str, num_cores: int, index_name: str):
+    # check software
+    bowtie2 = check_executable(config.BOWTIE2_BIN)
+    samtools = check_executable(config.SAMTOOLS_BIN)
 
-def peakcall(contol_file_name, treated_file_name, read_type):
-    """Performs peak calling using MACS3.
+    r1_files = sorted([f for f in input_files if "_R1_" in Path(f).name])
+    r2_files = sorted([f for f in input_files if "_R2_" in Path(f).name])
 
-    Args:
-        contol_file_name (str): Control file base name (without extension).
-        treated_file_name (str): Treated file base name (without extension).
-        read_type (str): '1' for single-end reads, '2' for paired-end reads.
+    if not r1_files:
+        raise ValueError("R1ファイルが見つかりません")
 
-    Raises:
-        TypeError: If read_type is invalid or peak calling fails.
-    """
-    print_green("========== peakcalling ==========")
-    if f"c{contol_file_name}_t{treated_file_name}_peakcalling_peaks.xls" not in files_in_directory:
-        peakcall_result = None
-        if read_type == "1":
-            peakcall_result = subprocess.run(["macs3", "callpeak",
-                                              "-c", f"{contol_file_name}.sort.bam",
-                                              "-t", f"{treated_file_name}.sort.bam",
-                                              "-n", f"c{contol_file_name}_t{treated_file_name}_peakcalling",
-                                              "-p", "0.05",
-                                              "-g", "1.19e8"],
-                                             capture_output=True, text=True)
-        elif read_type == "2":
-            peakcall_result = subprocess.run(["macs3", "callpeak",
-                                              "-c", f"{contol_file_name}.sort.bam",
-                                              "-t", f"{treated_file_name}.sort.bam",
-                                              "-n", f"c{contol_file_name}_t{treated_file_name}_peakcalling",
-                                              "-p", "0.05",
-                                              "-g", "1.19e8",
-                                              "-f", "BAMPE"],
-                                             capture_output=True, text=True)
+    is_paired = bool(r2_files)
+
+    r1_merged   = f"{output_dir}/{output_name}_R1.fastq"
+    r2_merged   = f"{output_dir}/{output_name}_R2.fastq" if is_paired else None
+    sam_file    = f"{output_dir}/{output_name}.sam"
+    bam_file    = f"{output_dir}/{output_name}.bam"
+    sorted_bam  = f"{output_dir}/{output_name}.sort.bam"
+
+    if not os.path.exists(sam_file):
+        with open(r1_merged, "wb") as w:
+            for f in r1_files:
+                with open(f, "rb") as r:
+                    shutil.copyfileobj(r, w)
+
+        if is_paired and r2_merged is not None:
+            with open(r2_merged, "wb") as w:
+                for f in r2_files:
+                    with open(f, "rb") as r:
+                        shutil.copyfileobj(r, w)
+
+        MAPPING_INDEX = f"{config.BOWTIE2_INDEX_DIR}/{index_name}"
+        cmd = [
+            bowtie2,
+            "-x", str(MAPPING_INDEX),
+            "-S", str(sam_file),
+            "-p", str(num_cores)
+        ]
+        
+        if is_paired:
+            cmd += ["-1", str(r1_merged), "-2", str(r2_merged)]
         else:
-            raise TypeError('Peakcalling error')
+            cmd += ["-U", str(r1_merged)]
 
-        output_file = 'output_peakcall.txt'
-        subprocess.run(["chmod", "+w", output_file], capture_output=True, text=True)
-        mode = "a" if os.path.exists(output_file) else "w"
-        with open(output_file, mode) as f:
-            f.write(f"\ncontrol: {contol_file_name} \ntreatment: {treated_file_name}\n")
-            f.write(peakcall_result.stdout)
-            f.write(peakcall_result.stderr)
-        print("Peak calling results saved in", output_file)
+        outputlog_file = os.path.join(output_dir, config.MAPPING_LOG_FILE)
+        
+        mode = "a" if os.path.exists(outputlog_file) else "w"
+        with open(outputlog_file, mode, encoding="utf-8") as log_file:
+            result = subprocess.run(cmd, capture_output=True, text=True)
+            log_file.write(f"Command: {' '.join(cmd)}\n")
+            log_file.write(result.stdout)
+            log_file.write(result.stderr)
+            result.check_returncode()
 
-    if f"c{contol_file_name}_t{treated_file_name}_peakcalling_peaks_merge.xlsx" not in files_in_directory:
+            for samtools_cmd in [
+                [samtools, "view", "-@", str(config.NUM_CORES), "-bS", str(sam_file), "-o", str(bam_file)],
+                [samtools, "sort", "-@", str(config.NUM_CORES), str(bam_file), "-o", str(sorted_bam)],
+                [samtools, "index", str(sorted_bam)],
+            ]:
+                result = subprocess.run(samtools_cmd, capture_output=True, text=True)
+                log_file.write(result.stdout)
+                log_file.write(result.stderr)
+                result.check_returncode()
+
+
+def peakcall(output_dir, control_file_name, treated_file_name, read_type, pvalue, genome_size, no_model=False):
+    # check software
+    macs3 = check_executable(config.MACS3_BIN)
+
+    if read_type not in ["1", "2"]:
+        raise ValueError("read_type must be '1' (single-end) or '2' (paired-end)")
+
+    peakcall_prefix = f"c{control_file_name}_t{treated_file_name}_peakcalling"
+    peakcall_name   = f"{output_dir}/{peakcall_prefix}"
+    peak_xls        = f"{output_dir}/{peakcall_prefix}_peaks.xls"
+    peak_narrow     = f"{output_dir}/{peakcall_prefix}_peaks.narrowPeak"
+    merged_xlsx     = f"{output_dir}/{peakcall_prefix}_peaks_merge.xlsx"
+
+    if not os.path.exists(peak_xls):
+        bam_control = f"{output_dir}/{control_file_name}.sort.bam"
+        bam_treated = f"{output_dir}/{treated_file_name}.sort.bam"
+        if not (os.path.exists(bam_control) and os.path.exists(bam_treated)):
+            raise FileNotFoundError(f"BAM files not found: {bam_control}, {bam_treated}")
+
+        cmd = [
+            macs3, "callpeak",
+            "-c", bam_control,
+            "-t", bam_treated,
+            "-n", peakcall_name,
+            "-p", pvalue,
+            "-g", genome_size,
+        ]
+        if read_type == "2":
+            cmd += ["-f", "BAMPE"]
+
+        if no_model:
+            cmd += ["--nomodel", "--extsize", str(config.MACS3_EXTSIZE)]
+
+        result = subprocess.run(cmd, capture_output=True, text=True)
+        outputlog_file = os.path.join(output_dir, config.PEAKCALL_LOG_FILE)
+        with open(outputlog_file, "a") as f:
+            f.write(f"\n[MACS3 Output: {control_file_name} vs {treated_file_name}]\n")
+            f.write(result.stdout)
+            f.write(result.stderr)
+        if result.returncode != 0:
+            raise RuntimeError("MACS3 peak calling failed")
+
+    if not os.path.exists(merged_xlsx):
         try:
-            print(" ==> Merging Excel files...")
-            file = f"c{contol_file_name}_t{treated_file_name}_peakcalling_peaks.xls"
-            df = pd.read_csv(file, sep='\t', skiprows=30)
-            file_narrow = f"c{contol_file_name}_t{treated_file_name}_peakcalling_peaks.narrowPeak"
-            df_narrow = pd.read_table(file_narrow, header=None)
-            df_narrow.columns = ["chromosome", "start coordinate", "end coordinate", "name", "score", "strand", "signalValue", "pValue", "qValue", "peaksignal"]
-            df_merge = df.merge(df_narrow[['score', 'peaksignal']], left_index=True, right_index=True)
-            df_merge = df_merge[(df_merge['chr'] != 'Mt') & (df_merge['chr'] != 'Pt')]
-            outfile = f"c{contol_file_name}_t{treated_file_name}_peakcalling_peaks_merge.xlsx"
-            df_merge.to_excel(outfile, index=False)
-            print(f"Saved merged file as {outfile}")
-        except:
-            print_red("Error occurred during Excel processing")
+            df_xls = pd.read_csv(peak_xls, sep='\t', skiprows=30)
+            df_narrow = pd.read_table(peak_narrow, header=None)
+            df_narrow.columns = [
+                "chromosome", "start coordinate", "end coordinate", "name", "score",
+                "strand", "signalValue", "pValue", "qValue", "peaksignal"
+            ]
+            df_merged = df_xls.merge(
+                df_narrow[["name", "score", "peaksignal"]],
+                on="name"
+            )
+            if "chr" in df_merged.columns:
+                df_merged = df_merged[~df_merged["chr"].isin(["Mt", "Pt"])]
+            df_merged.to_excel(merged_xlsx, index=False)
+        except Exception as e:
+            print(f"[ERROR] Excel merge failed: {e}")
+
 
 def annotation(combined_excel_file):
-    """Performs annotation using an R script.
+    if not os.path.exists(f"{combined_excel_file}.xlsx"):
+        raise FileNotFoundError(f"Combined Excel file not found: {combined_excel_file}")
+    if not os.path.exists(config.R_SCRIPT_NAME):
+        raise FileNotFoundError(f"R script not found: {config.R_SCRIPT_NAME}")
+    if not os.path.exists(config.R_ANNOTATION_FILE):
+        raise FileNotFoundError(f"R annotation file not found: {config.R_ANNOTATION_FILE}")
+    
+    subprocess.run(["chmod", "+x", config.R_SCRIPT_NAME], capture_output=True, text=True)
 
-    Args:
-        combined_excel_file (str): Path to the merged Excel file from peak calling.
-
-    Raises:
-        subprocess.CalledProcessError: If the R script execution fails.
-    """
-    print_green("========== annotation ==========")
-    arguments = [combined_excel_file]
-    command = ["Rscript", r_script_path] + arguments
+    command = ["Rscript", config.R_SCRIPT_NAME, combined_excel_file, config.R_ANNOTATION_FILE]
     try:
         result = subprocess.run(command, capture_output=True, check=True, text=True)
-        print("Annotation completed successfully")
-        print(result.stdout)
+        print("Annotation succeeded.")
+        print("\n", result.stdout)
     except subprocess.CalledProcessError as e:
-        print_red("Error occurred during annotation:")
-        print(e.stderr)
+        print("Error occurred during annotation:")
+        print("Return code:", e.returncode)
+        print("STDOUT:\n", e.stdout)
+        print("STDERR:\n", e.stderr)
+
 
 if __name__ == "__main__":
-    print_green(
+    print(
         """
 control_file_name, treated_file_name: (example) YTHM21_S10, YTMN01_S3, ...
 read_type: 1 or 2.  1 is single end, 2 is pair end.

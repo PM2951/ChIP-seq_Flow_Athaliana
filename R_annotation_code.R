@@ -1,16 +1,27 @@
 args <- commandArgs(trailingOnly = TRUE)
 
-# 引数の数を確認し、引数がない場合はエラーメッセージを表示する
-if (length(args) == 0) {
-  stop("引数が必要です。")
+# コマンドライン引数の確認
+file_path = args[1]       # Excelファイルパス
+annotation_file = args[2] # アノテーションファイルのパス
+
+# 依存するCRANパッケージを入れる
+if (!requireNamespace("readxl", quietly = TRUE)) {
+  install.packages("readxl", repos = "https://cloud.r-project.org")
+}
+if (!requireNamespace("BiocManager", quietly = TRUE)) {
+  install.packages("BiocManager", repos = "https://cloud.r-project.org")
+}
+# Bioconductorパッケージ
+if (!requireNamespace("ChIPpeakAnno", quietly = TRUE)) {
+  BiocManager::install("ChIPpeakAnno", update = FALSE, ask = FALSE)
 }
 
-# 引数を表示する
-library(readxl) 
-#BiocManager::install("ChIPpeakAnno") ←インストール済
-library("ChIPpeakAnno")
-#ファイル名を入れる↓↓↓
-file_path = args
+
+library(readxl)
+library(ChIPpeakAnno)
+
+
+
 # パスとファイル名に分割する関数を定義
 split_path <- function(file_path) {
   # 最後のスラッシュを探す
@@ -28,7 +39,7 @@ peak.df = read_excel(paste0(file_path, ".xlsx"))
 peak.df$peak <- 1:nrow(peak.df)
 peak.rd <- GRanges(seqnames=peak.df$chr, ranges=IRanges(start=peak.df$start, end=peak.df$end, names= peak.df$peak))
 #head(peak.rd)
-gene_reference.df = read.table(paste0(fname$directory, "Athaliana_gene_ref.txt"), sep="\t", header=FALSE)
+gene_reference.df = read.table(annotation_file, sep="\t", header=FALSE)
 #head(gene_reference.df)
 colnames(gene_reference.df) <- c("name", "txStart", "txEnd", "chrom", "strand")
 gene_reference.rd <- GRanges(seqnames=Rle(gene_reference.df$chrom), ranges=IRanges(start=gene_reference.df$txStart, end=gene_reference.df$txEnd, name=gene_reference.df$name), strand=Rle(gene_reference.df$strand))

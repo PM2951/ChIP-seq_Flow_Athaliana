@@ -2,7 +2,7 @@
 # ChIP-seqアプリケーションの設定ファイル
 
 # ディレクトリや実行ファイル
-BOWTIE2_INDEX_DIR     = "/home/pm2951/ChIP-seq_Flow_Athaliana/bowtie2_index"
+BOWTIE2_INDEX_DIR     = "<your path>/ChIP-seq_Flow_Athaliana/bowtie2_index"
 BOWTIE2_BIN           = "bowtie2"
 SAMTOOLS_BIN          = "samtools"
 MACS3_BIN             = "macs3"
@@ -26,5 +26,5 @@ MAPPING_LOG_FILE      = "log_mapping.txt"
 PEAKCALL_LOG_FILE     = "log_peakcall.txt"
 
 # R アノテーションファイル
-R_SCRIPT_NAME         = "/home/pm2951/ChIP-seq_Flow_Athaliana/R_annotation_code.R"
-R_ANNOTATION_FILE     = "/home/pm2951/ChIP-seq_Flow_Athaliana/Athaliana_gene_ref.txt"
+R_SCRIPT_NAME         = "<your path>/ChIP-seq_Flow_Athaliana/R_annotation_code.R"
+R_ANNOTATION_FILE     = "<your path>/ChIP-seq_Flow_Athaliana/Athaliana_gene_ref.txt"

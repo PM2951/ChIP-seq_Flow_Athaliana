@@ -57,11 +57,9 @@ pip install MACS3
    cd <your directory>
    ```
 
-   - FASTQ files are required (uncompressed .fastq format only).
-    If your files are compressed (e.g., .gz), make sure to decompress them first using.
-     ```bash
-     gunzip *.gz
-     ```
+   - FASTQ files are required.
+  
+   - supported: (".fastq", ".fastq.gz", ".fq", ".fq.gz", "fasta", ".fasta.gz")
 
 4. Execute the main script with required arguments.
 

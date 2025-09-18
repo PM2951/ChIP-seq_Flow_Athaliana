@@ -22,7 +22,7 @@ p = argparse.ArgumentParser(
     ))
 
 p.add_argument(
-    "-r", '--read_type', choices=['1', '2'], required=True, default=config.READ_TYPE,
+    "-r", '--read_type', choices=['1', '2'], default=config.READ_TYPE,
     help=(
         "Specify the type of sequencing reads to process. "
         "Choose '1' for single-end reads or '2' for paired-end reads. "
@@ -100,7 +100,7 @@ p.add_argument(
         f"Default is {config.GENOME_SIZE} for Arabidopsis thaliana."
     ))
 p.add_argument(
-    "-v", '--pvalue', default=config.DEFAULT_PVALUE,
+    "-pv", '--pvalue', default=config.DEFAULT_PVALUE,
     help=(
         "P-value threshold for peak calling. "
         "This sets the stringency for identifying significant peaks. "
@@ -195,13 +195,23 @@ try:
             for f in as_completed(futures):
                 f.result()
         print("[Mapping] Both mapping jobs finished.", flush=True)
+except Exception as e:
+    raise ValueError(f"Error during processing: {e}")
 
+try:
     if params["peakcall_flag"]:
         peakcall(params["output_dir"], params["control_name"], params["treated_name"], params["read_type"],
                 pvalue=params["pvalue"], genome_size=params["genome_size"],
                 no_model=params["no_model"])
         print("[Peak Calling] Peak calling finished.", flush=True)
+except:
+    log_file_path = os.path.join(params["output_dir"], "log_peakcall.txt")
+    if os.path.exists(log_file_path):
+        with open(log_file_path, "r") as log_file:
+            lines = log_file.readlines()
+            print("".join(lines[-3:]), flush=True)
 
+try:
     if params["annotation_flag"]:
         peak_file = os.path.join(params["output_dir"], f"c{params['control_name']}_t{params['treated_name']}_peakcalling_peaks_merge")    #Rの中で.xlsxに変換される
         annotation(peak_file)
@@ -209,7 +219,7 @@ try:
 
     print("\nAll processes completed successfully!", flush=True)
 except Exception as e:
-    raise RuntimeError(f"Error during processing: {e}", flush=True)
+    raise ValueError(f"Error during processing: {e}")
 
 
 sleep(1)

@@ -1,137 +1,215 @@
-#解析したfastaqがあるファルダにcdで移動
-#MN05_S18などの4分割されたfastaqに共通して存在するファイル名を入力してrun
-
-import subprocess
 import os
 import shutil
-from ChIPseq_utili import mapping, peakcall, annotation
+from time import sleep
+from datetime import datetime, timedelta
+from concurrent.futures import ThreadPoolExecutor, as_completed
 import argparse
 
-#コマンドラインに色をつける
-def print_green(text):
-    print("\033[92m" + text + "\033[0m")
-def print_red(text):
-    print("\033[91m" + text + "\033[0m")
-def copy_if_not_exists(src_dir, dest_dir, filenames):
-    for filename in filenames:
-        src_file = os.path.join(src_dir, filename)
-        dest_file = os.path.join(dest_dir, filename)
-        if not os.path.exists(dest_file):
-            shutil.copyfile(src_file, dest_file)
-            print(f"File '{filename}' copied")
-def making_dir(output_dir):
-    if not os.path.exists(output_dir):
-        os.makedirs(output_dir)
-        print(f"Output directory '{output_dir}' created")
+# 設定ファイルをインポート
+import config  
+from ChIPseq_app_utili import mapping, peakcall, annotation, write_run_parameters
+
+
+file_extentions = (".fastq", ".fastq.gz", ".fq", ".fq.gz", "fasta", ".fasta.gz")
 
 
 # Create parser with a detailed description of the pipeline
-parser = argparse.ArgumentParser(
+p = argparse.ArgumentParser(
     description=(
         "ChIP-seq analysis pipeline to process sequencing data, "
         "including mapping, peak calling, and annotation. "
         "Specify input files and choose the analysis steps to perform."
     ))
-# Add arguments with detailed help messages
-parser.add_argument(
-    "-r", '--read_type', choices=['1', '2'], required=True,
+
+p.add_argument(
+    "-r", '--read_type', choices=['1', '2'], required=True, default=config.READ_TYPE,
     help=(
         "Specify the type of sequencing reads to process. "
         "Choose '1' for single-end reads or '2' for paired-end reads. "
         "This affects the alignment and downstream analysis steps."
     ))
-parser.add_argument(
-    "-c", '--control', required=True,
+
+p.add_argument(
+    "-c", '--control_name', required=True,
     help=(
-    "Specify the common prefix (e.g., FILENAME) of the control sample files in FASTQ format. "
-    "The files should follow the naming pattern: "
-    "'FILENAME_001_R1_001.fastq', 'FILENAME_002_R1_001.fastq', 'FILENAME_001_R1_003.fastq', 'FILENAME_002_R1_004.fastq'. "
-    "For example, if you input 'FILENAME', the script will process all matching files in the directory. "
-    "The control sample is used to normalize the signal and reduce false positives in peak calling."
+        "Specify the common prefix (e.g., FILENAME) of the control sample files in FASTQ format. "
+        "The files should follow the naming pattern: "
+        "'FILENAME_001_R1_001.fastq', 'FILENAME_002_R1_001.fastq', 'FILENAME_001_R1_003.fastq', 'FILENAME_002_R1_004.fastq'. "
+        "For example, if you input 'FILENAME', the script will process all matching files in the directory. "
+        "The control sample is used to normalize the signal and reduce false positives in peak calling."
+        f"supported file extensions are: {', '.join(file_extentions)}"
     ))
-parser.add_argument(
-    "-t", '--treated', required=True,
+
+p.add_argument(
+    "-t", '--treated_name', required=True,
     help=(
         "Specify the common prefix (e.g., FILENAME) of the treated sample files in FASTQ format."
         "The files should follow the naming pattern:"
         "  'FILENAME_001_R1_001.fastq', 'FILENAME_002_R1_001.fastq', 'FILENAME_003_R1_001.fastq', 'FILENAME_004_R1_001.fastq'."
         "For example, if you input 'FILENAME', the script will process all matching files in the directory."
         "The treated sample is used to identify regions with significant changes in signal compared to the control sample during peak calling."
+        f"supported file extensions are: {', '.join(file_extentions)}"
     ))
-parser.add_argument(
-    "-m", '--mapping', action='store_true',
+
+p.add_argument(
+    "-o", '--output_dir', default="output",
+    help=(
+        "Specify the output directory for the analysis results. "
+        "All output files will be saved in this directory."
+    ))
+
+p.add_argument(
+    "-m", '--mapping_flag', action='store_true',
     help=(
         "Flag to perform read mapping to the reference genome. "
         "This step aligns sequencing reads to the reference and outputs BAM files."
     ))
 
-parser.add_argument(
-    "-p", '--peakcall', action='store_true',
+p.add_argument(
+    "-p", '--peakcall_flag', action='store_true',
     help=(
         "Flag to perform peak calling. "
         "This step identifies regions of significant ChIP enrichment in the genome."
     ))
 
-parser.add_argument(
-    "-a", '--annotation', action='store_true',
+p.add_argument(
+    "-a", '--annotation_flag', action='store_true',
     help=(
         "Flag to perform annotation of the identified peaks. "
         "The peaks will be annotated with genomic features (e.g., genes, promoters)."
     ))
-parser.add_argument(
-    "-n", '--num_cores', type=int, default=32,
+p.add_argument(
+    "-n", '--num_cores', type=int, default=config.NUM_CORES,
     help=(
         "Number of CPU cores to use for parallel processing. "
         "Specify this to speed up the analysis by using multiple cores."
-        "default 32"
+        f"Default is {config.NUM_CORES}."
     ))
-args = parser.parse_args()
+p.add_argument(
+    "-i", '--index_name', default=config.BOWTIE2_INDEX_NAME,
+    help=(
+        "Specify the name of the Bowtie2 index to use for read mapping. "
+        "This should correspond to the reference genome you are aligning against. "
+        f"Default is {config.BOWTIE2_INDEX_NAME} for Arabidopsis thaliana."
+    ))
+p.add_argument(
+    "-g", '--genome_size', default=config.GENOME_SIZE,
+    help=(
+        "Effective genome size for peak calling. "
+        "This is used by MACS3 to estimate the background model. "
+        f"Default is {config.GENOME_SIZE} for Arabidopsis thaliana."
+    ))
+p.add_argument(
+    "-v", '--pvalue', default=config.DEFAULT_PVALUE,
+    help=(
+        "P-value threshold for peak calling. "
+        "This sets the stringency for identifying significant peaks. "
+        f"Default is {config.DEFAULT_PVALUE}"
+    ))
+p.add_argument(
+    "--no_model", action='store_true',
+    help=(
+        "Flag to skip model building during peak calling. "
+        "Use this if you want to call peaks without the default model."
+    ))
+
+args = p.parse_args()
+
+current_dir = os.getcwd()
+output_dir = os.path.join(current_dir, args.output_dir)
+os.makedirs(output_dir, exist_ok=True)
+
 
 # コマンドライン引数の表示
 print(" Parameters")
 print(f"    -read_type  : {args.read_type}")
-print(f"    -control    : {args.control}")
-print(f"    -treated    : {args.treated}")
-print(f"    -mapping    : {args.mapping}")
-print(f"    -peakcall   : {args.peakcall}")
-print(f"    -annotation : {args.annotation}")
+print(f"    -control    : {args.control_name}")
+print(f"    -treated    : {args.treated_name}")
+print(f"    -output     : {args.output_dir}")
+print(f"    -mapping    : {args.mapping_flag}")
+print(f"    -peakcall   : {args.peakcall_flag}")
+print(f"    -annotation : {args.annotation_flag}")
 print(f"    -core       : {args.num_cores}")
 
-# 出力ディレクトリの作成
-# ディレクトリとファイル名の設定, ChIP用TAIR10ファイルの取得
-src_dir = os.path.dirname(os.path.abspath(__file__))  # ChIP用TAIR10ファイルのディレクトリ
-current_dir = os.getcwd()
-filenames = ["Arabidopsis_thaliana.TAIR10.dna.toplevel.fa", 
-             "Arabidopsis_thaliana.TAIR10.dna.toplevel.fa.fai", 
-             "TAIR10.1.bt2", "TAIR10.2.bt2", "TAIR10.3.bt2", "TAIR10.4.bt2", 
-             "TAIR10.rev.1.bt2", "TAIR10.rev.2.bt2",
-             "Athaliana_gene_ref.txt",
-             ]
-copy_if_not_exists(src_dir, current_dir, filenames)
 
-# # main functions
-if args.mapping:
-    mapping(args.control, args.read_type, str(args.num_cores))
-    mapping(args.treated, args.read_type, str(args.num_cores))
+control_files = sorted([f for f in os.listdir(current_dir) if f.startswith(args.control_name) and f.endswith(file_extentions)])
+if len(control_files) == 0:
+    raise FileNotFoundError(f"Error: No control FASTQ files found with prefix '{args.control_name}'")
 
-if args.peakcall:
-    peakcall(args.control, args.treated, args.read_type)
+treatment_files = sorted([f for f in os.listdir(current_dir) if f.startswith(args.treated_name) and f.endswith(file_extentions)])
+if len(treatment_files) == 0:
+    raise FileNotFoundError(f"Error: No treatment FASTQ files found with prefix '{args.treated_name}'")
 
-if args.annotation:
-    annotation(f"{current_dir}/c{args.control}_t{args.treated}_peakcalling_peaks_merge")
+print("FILES:", flush=True)
+print(" -Control files:")
+for i, f in enumerate(control_files):
+    print(f"    - {i+1}: {f}")
 
+print(" -Treatment files:")
+for i, f in enumerate(treatment_files):
+    print(f"    - {i+1}: {f}")
+
+finish_time = datetime.now() + timedelta(minutes=10)
+print("\nExpected finish time:", finish_time.strftime("%Y-%m-%d %H:%M"), flush=True)
+print("\nRunning analysis.....", flush=True)
 
 
 
+# 解析を実行
+params = {
+    "mapping_flag": args.mapping_flag,
+    "peakcall_flag": args.peakcall_flag,
+    "annotation_flag": args.annotation_flag,
+    "control_name": args.control_name,
+    "treated_name": args.treated_name,
+    "control_files": control_files,
+    "treatment_files": treatment_files,
+    "output_dir": output_dir,
+    "read_type": str(args.read_type),
+    "index_name": args.index_name,
+    "pvalue": args.pvalue,
+    "genome_size": args.genome_size,
+    "num_cores": config.NUM_CORES,
+    "no_model": args.no_model,
+}
+
+# output_dirを除いたパラメータ辞書
+params_without_output_dir = {k: v for k, v in params.items() if k != "output_dir"}
+write_run_parameters(
+    output_dir=params["output_dir"],
+    file_name=f"c{params['control_name']}_t{params['treated_name']}_{config.PARAMS_LOG_FILE}",
+    **params_without_output_dir
+)
+
+try:
+    if params["mapping_flag"]:
+        print("[Mapping] Running control and treatment mapping in parallel...", flush=True)
+
+        with ThreadPoolExecutor(max_workers=2) as executor:
+            futures = [
+                executor.submit(mapping, params["control_name"], params["control_files"], params["output_dir"], params["num_cores"], params["index_name"]),
+                executor.submit(mapping, params["treated_name"], params["treatment_files"], params["output_dir"], params["num_cores"], params["index_name"]),
+            ]
+
+            # Ensure that any exceptions in the worker threads are raised here
+            for f in as_completed(futures):
+                f.result()
+        print("[Mapping] Both mapping jobs finished.", flush=True)
+
+    if params["peakcall_flag"]:
+        peakcall(params["output_dir"], params["control_name"], params["treated_name"], params["read_type"],
+                pvalue=params["pvalue"], genome_size=params["genome_size"],
+                no_model=params["no_model"])
+        print("[Peak Calling] Peak calling finished.", flush=True)
+
+    if params["annotation_flag"]:
+        peak_file = os.path.join(params["output_dir"], f"c{params['control_name']}_t{params['treated_name']}_peakcalling_peaks_merge")    #Rの中で.xlsxに変換される
+        annotation(peak_file)
+        print("[Annotation] Annotation finished.", flush=True)
+
+    print("\nAll processes completed successfully!", flush=True)
+except Exception as e:
+    raise RuntimeError(f"Error during processing: {e}", flush=True)
 
 
-# # one time run, ファイルが大きすぎると途中でbowtie2が処理落ちする可能性あり。
-# read_type = "1"
-# file_names = [
-#     "YTMN14_S2",
-# ]
-# for file_name in file_names:
-#     control_file_name = "YTMN16_S4"
-#     treated_file_name = file_name
-#     peakcall(control_file_name, treated_file_name, read_type)
-#     annotation(f"{current_dir}/c{control_file_name}_t{treated_file_name}_peakcalling_peaks_merge")
+sleep(1)

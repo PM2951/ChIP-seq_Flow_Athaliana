@@ -12,8 +12,8 @@ This repository provides a streamlined workflow for analyzing ChIP-seq data, lev
 ## Prerequisites
 
 ### Required Software
-- Python (>= 3.8)
-- R (>= 4.0)
+- Python (>= 3.10)
+- R
 - Bowtie2
 - samtools
 - MACS3 (Install below)

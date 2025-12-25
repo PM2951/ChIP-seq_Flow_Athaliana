@@ -32,8 +32,7 @@ cd ChIP-seq_AnalysisFlow
 curl https://ftp.ensemblgenomes.ebi.ac.uk/pub/plants/release-60/fasta/arabidopsis_thaliana/dna/Arabidopsis_thaliana.TAIR10.dna.toplevel.fa.gz -o Arabidopsis_thaliana.TAIR10.dna.toplevel.fa.gz
 gunzip Arabidopsis_thaliana.TAIR10.dna.toplevel.fa.gz
 bowtie2-build -f Arabidopsis_thaliana.TAIR10.dna.toplevel.fa /bowtie2_index/TAIR10
-pip install openpyxl pandas
-pip install MACS3
+pip install openpyxl pandas customtkinter MACS3
 ```
 
 ### Rename directory name in config.py 

@@ -25,11 +25,6 @@ Ensure both Python and R are installed on your system.
 - R Dependencies
 Install the required R packages by running the following commands in an R session:
 
-```R
-install.packages(c("dplyr", "ggplot2", "tidyr", "readxl"))
-BiocManager::install("ChIPpeakAnno")
-```
-
 
 ```bash
 git clone https://github.com/PM2951/ChIP-seq_Flow_Athaliana.git
